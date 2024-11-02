@@ -1,0 +1,109 @@
+// Define constants
+const int DESIRED_DISTANCE = 10;      // cm (From the left wall)
+const int FRONT_DESIRED_DISTANCE = 5; // cm (Front distance to stop)
+const int TURN_SPEED = 50;            // Speed when turning
+const int FORWARD_SPEED = 100;        // Speed when moving forward
+
+// Define sensor pins (adjust these based on your setup)
+const int LEFT_SENSOR_PIN = A0;
+const int FRONT_SENSOR_PIN = A1;
+
+// Function to get sensor readings (example with analog sensors)
+int get_left_sensor_reading() 
+{
+  return analogRead(LEFT_SENSOR_PIN);  // Replace with actual sensor reading
+}
+
+int get_front_sensor_reading() 
+{
+  return analogRead(FRONT_SENSOR_PIN); // Replace with actual sensor reading
+}
+
+// Movement functions (to be implemented based on your motor driver)
+void stop_bot() 
+{
+  // Add motor stop code here
+}
+
+void move_forward() 
+{
+  // Add forward movement code here
+}
+
+void turn_left(int degrees)
+ {
+  // Code to turn left by the specified degrees
+  // You can adjust this based on time to turn for certain angles
+}
+
+void turn_right(int degrees) 
+{
+  // Code to turn right by the specified degrees
+}
+
+// Wall Hugger Algorithm
+void wall_hugger_algorithm()
+ {
+  while (true) 
+  {
+    int left_dist = get_left_sensor_reading();
+    int front_dist = get_front_sensor_reading();
+
+    // Wall following behavior
+    if (front_dist > FRONT_DESIRED_DISTANCE) 
+    {
+      move_forward();  // Keep moving forward until the front obstacle is detected
+
+      if (left_dist > DESIRED_DISTANCE) 
+      {
+        stop_bot();
+        turn_left(15); // Turn left by 15 degrees (adjust as necessary)
+        move_forward();
+      } 
+      else if (left_dist < DESIRED_DISTANCE) 
+      {
+        stop_bot();
+        turn_right(15); // Turn right by 15 degrees (adjust as necessary)
+        move_forward();
+      } 
+      else 
+      {
+        move_forward(); // When at correct distance from the wall, continue straight
+      }
+    }
+
+    // Front obstacle detection
+    if (front_dist <= FRONT_DESIRED_DISTANCE) 
+    {
+      stop_bot();
+      while (get_front_sensor_reading() < 15) 
+      {  // While obstacle is too close
+        left_dist = get_left_sensor_reading();  // Update left distance
+        if (left_dist > DESIRED_DISTANCE) 
+        {
+          turn_right(30);  // Turn right by 30 degrees if too far from the wall
+        } else 
+        {
+          turn_right(30);  // If close to the wall, still turn right by 30 degrees
+        }
+      }
+    }
+
+    delay(100);  // Small delay for sensor readings update
+  }
+}
+
+void setup() 
+{
+  // Initialize sensor and motor pins
+  pinMode(LEFT_SENSOR_PIN, INPUT);
+  pinMode(FRONT_SENSOR_PIN, INPUT);
+
+  // Add motor setup code if necessary
+}
+
+void loop() 
+{
+  wall_hugger_algorithm();  // Start the wall-hugger behavior
+}
+
