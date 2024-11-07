@@ -1,0 +1,167 @@
+//PID Code Untested (No obstacle detection, only maintains wall distance):
+
+#include <stdio.h>
+#include <stdint.h>
+#include <math.h>
+
+// Define GPIO pins for motors and ultrasonic sensor
+#define L_TRIGGER_PIN 2         // Left Ultrasonic sensor trigger pin
+#define L_ECHO_PIN 3            // Left Ultrasonic sensor echo pin
+#define F_TRIGGER_PIN 8        // Front Ultrasonic sensor trigger pin
+#define F_ECHO_PIN 9            // Front Ultrasonic sensor echo pin
+#define LEFT_MOTOR_FORWARD 4   // Left motor forward pin
+#define LEFT_MOTOR_BACKWARD 5  // Left motor backward pin
+#define RIGHT_MOTOR_FORWARD 6  // Right motor forward pin
+#define RIGHT_MOTOR_BACKWARD 7 // Right motor backward pin
+#define enA 10  //rpm pin for left wheel
+#define enB 11  //rpm pin for right wheel
+#define rpm 50 //standard rpm value for wheel that turns faster
+#define crpm 50 //complementary rpm value for the other wheel     
+float leftDistance, frontDistance;
+
+//initialising pid parameters
+const float kp = 2.0;
+const float ki = 0.0;
+const float kd = 0.0;
+float error = 0;
+float prevError = 0;
+float totalError = 0;
+float pidResult = 0;
+float proportional = 0;
+float integral = 0;
+float derivative = 0;
+
+// Define distance thresholds in centimeters
+#define SOUND_SPEED 0.034 
+const int DESIRED_DISTANCE = 10;      // cm (From the left wall)
+const int FRONT_DESIRED_DISTANCE = 30; // cm (Front distance to stop) 
+
+void setup() 
+{
+    // Set motor pins as output
+    pinMode(LEFT_MOTOR_FORWARD, OUTPUT);
+    pinMode(LEFT_MOTOR_BACKWARD, OUTPUT);
+    pinMode(RIGHT_MOTOR_FORWARD, OUTPUT);
+    pinMode(RIGHT_MOTOR_BACKWARD, OUTPUT);
+    
+    // Set ultrasonic sensor pins
+    pinMode(L_TRIGGER_PIN, OUTPUT);
+    pinMode(F_TRIGGER_PIN, OUTPUT);
+    pinMode(L_ECHO_PIN, INPUT);
+    pinMode(F_ECHO_PIN, INPUT);
+    pinMode(enA, OUTPUT);
+    pinMode(enB, OUTPUT);
+    analogWrite(enA, rpm);
+    analogWrite(enB, rpm);
+
+    Serial.begin(9600);
+}
+
+// Function to get distance from ultrasonic sensor in centimeters
+float getDistance(int triggerPin, int echoPin) 
+{
+    float distance;
+
+    // Send a 10us pulse to trigger the ultrasonic sensor
+    digitalWrite(triggerPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(triggerPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(triggerPin, LOW);
+
+    // Measure the pulse duration in microseconds on the echo pin
+    long duration = pulseIn(echoPin, HIGH);
+
+    // Calculate distance based on the duration
+    distance = (duration * SOUND_SPEED) / 2;
+
+    return distance;
+}
+
+void move_forward() 
+{
+    analogWrite(enA, rpm);
+    analogWrite(enB, rpm);
+    //both motors move with same rpm
+    digitalWrite(LEFT_MOTOR_FORWARD, HIGH);
+    digitalWrite(LEFT_MOTOR_BACKWARD, LOW);
+    digitalWrite(RIGHT_MOTOR_FORWARD, HIGH);
+    digitalWrite(RIGHT_MOTOR_BACKWARD, LOW);
+}
+
+void turn_left() 
+{
+  //to turn left, right wheel rpm should be higher
+    analogWrite(enA, crpm);   //left wheel slower
+    analogWrite(enB, rpm);    //right wheel faster
+    digitalWrite(LEFT_MOTOR_FORWARD, HIGH);
+    digitalWrite(LEFT_MOTOR_BACKWARD, LOW);
+    digitalWrite(RIGHT_MOTOR_FORWARD, HIGH);
+    digitalWrite(RIGHT_MOTOR_BACKWARD, LOW);
+}
+
+void turn_right() 
+{
+  //to turn right, left wheel rpm should be higher
+    analogWrite(enA, rpm);   //left wheel faster
+    analogWrite(enB, crpm);  //right wheel slower
+    digitalWrite(LEFT_MOTOR_FORWARD, HIGH);
+    digitalWrite(LEFT_MOTOR_BACKWARD, LOW);
+    digitalWrite(RIGHT_MOTOR_FORWARD, HIGH);
+    digitalWrite(RIGHT_MOTOR_BACKWARD, LOW);
+}
+
+void stop_bot() 
+{
+    digitalWrite(LEFT_MOTOR_FORWARD, LOW);
+    digitalWrite(LEFT_MOTOR_BACKWARD, LOW);
+    digitalWrite(RIGHT_MOTOR_FORWARD, LOW);
+    digitalWrite(RIGHT_MOTOR_BACKWARD, LOW);
+}
+
+void loop()
+{
+    leftDistance = getDistance(L_TRIGGER_PIN, L_ECHO_PIN);
+    frontDistance = getDistance(F_TRIGGER_PIN, F_ECHO_PIN);
+    Serial.print("Left Distance:");
+    Serial.println (leftDistance);
+    Serial.print("Front Distance:"); 
+    Serial.println(frontDistance);
+
+    //implementing the pid
+    //propotional section
+    error = DESIRED_DISTANCE - leftDistance;
+    proportional = kp * error;
+    Serial.print("Proportional:");
+    Serial.println (proportional);
+    
+    //integral section
+    totalError += error;
+    integral = ki * totalError;
+    Serial.print("Integral:");
+    Serial.println (integral); 
+
+    //derivative section
+    derivative = kd * (error - prevError);
+    prevError = error;
+    Serial.print("Derivative:");
+    Serial.println (derivative);
+
+    pidResult = proportional + integral + derivative;
+    Serial.print("pidResult:");
+    Serial.println (pidResult);
+    if((rpm + pidResult) > 255)
+    pidResult = 255 - rpm; //limiting the pidResult value in case of avoid actuator saturation
+    else if((rpm + pidResult) < 0)
+    pidResult = 0 - rpm;
+
+    //making changes to the plant(motor)
+    digitalWrite(LEFT_MOTOR_FORWARD, HIGH);
+    digitalWrite(LEFT_MOTOR_BACKWARD, LOW);
+    digitalWrite(RIGHT_MOTOR_FORWARD, HIGH);
+    digitalWrite(RIGHT_MOTOR_BACKWARD, LOW);
+    analogWrite(enA,(rpm+pidResult));
+    analogWrite(enB,(rpm-pidResult));
+
+    delay(500);
+}
